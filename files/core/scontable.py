@@ -5,9 +5,20 @@ import pandas as pd
 SHAPE_PIER_COUNT = {"C": 3, "L": 2, "I": 1}
 
 
+_WORD_NUMS = re.compile(
+    r'\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|'
+    r'thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|'
+    r'thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)\b',
+    re.IGNORECASE
+)
+
 def _nsort(s):
     """Natural sort key: 'Story10' sorts after 'Story9', not after 'Story1'."""
     return [int(c) if c.isdigit() else c.lower() for c in re.split(r"(\d+)", s)]
+
+def _is_floor_story(s):
+    s = str(s)
+    return any(c.isdigit() for c in s) or bool(_WORD_NUMS.search(s))
 
 
 def read_pier_forces(file_path):
@@ -84,9 +95,9 @@ def build_table(file_path, story, piers):
 def build_overview_graphs(file_path):
     df_all = read_pier_forces(file_path)
 
-    # Exclude non-numeric story labels (MEZZ, EMR, CELLAR, BKRF, etc.)
+    # Exclude non-floor labels (EMR, BKRF, etc.) but keep numeric and word-number stories
     stories_asc  = sorted(
-        [s for s in df_all["Story"].unique().tolist() if any(c.isdigit() for c in str(s))],
+        [s for s in df_all["Story"].unique().tolist() if _is_floor_story(s)],
         key=_nsort
     )
     stories_desc = list(reversed(stories_asc))
@@ -226,7 +237,8 @@ def build_overview_graphs(file_path):
 
     pier_p_abs = [_rnd(max(abs(mx), abs(mn))) for mx, mn in zip(pier_p_max, pier_p_min)]
 
-    force_dist_global = make_force_dist(df, piers)
+    all_piers = sorted(df_all["Pier"].unique().tolist())
+    force_dist_global = make_force_dist(df_all, all_piers)
     force_dist_by_story = {s: make_force_dist(df[df["Story"]==s], sorted(df[df["Story"]==s]["Pier"].unique().tolist())) for s in stories_desc}
 
     return {

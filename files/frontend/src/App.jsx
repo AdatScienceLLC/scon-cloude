@@ -625,7 +625,8 @@ function AIIndicatorTab({ graphs }) {
 
   const insights = [];
 
-  const v2gov = graphs.V2?.governing;
+  const fd = graphs.force_dist;
+  const v2gov = fd?.v2?.governing;
   if (v2gov?.piers?.length) {
     const idx = v2gov.values.reduce((mi,v,i)=>Math.abs(v)>Math.abs(v2gov.values[mi])?i:mi, 0);
     insights.push({ icon:"⚡", label:"Critical Shear (V2) Pier", value:v2gov.piers[idx],
@@ -633,7 +634,7 @@ function AIIndicatorTab({ graphs }) {
       color:"#1d4ed8", bg:"#eff6ff" });
   }
 
-  const m3gov = graphs.M3?.governing;
+  const m3gov = fd?.m3?.governing;
   if (m3gov?.piers?.length) {
     const idx = m3gov.values.reduce((mi,v,i)=>Math.abs(v)>Math.abs(m3gov.values[mi])?i:mi, 0);
     insights.push({ icon:"🔩", label:"Critical Moment (M3) Pier", value:m3gov.piers[idx],
@@ -641,7 +642,7 @@ function AIIndicatorTab({ graphs }) {
       color:"#7c3aed", bg:"#f5f3ff" });
   }
 
-  const pgov = graphs.P?.governing;
+  const pgov = fd?.p?.governing;
   if (pgov?.piers?.length) {
     if (pgov.max_values?.length) {
       const idx = pgov.max_values.reduce((mi,v,i)=>v>pgov.max_values[mi]?i:mi, 0);
@@ -666,7 +667,6 @@ function AIIndicatorTab({ graphs }) {
     dominantCase = { name:top[0], count:top[1], total:allCases.length };
   }
 
-  // Per-pier summary table
   const pierSet = new Set([...(v2gov?.piers||[]),...(m3gov?.piers||[]),...(pgov?.piers||[])]);
   const pierRows = [...pierSet].map(pier => {
     const v2i = v2gov?.piers?.indexOf(pier);
@@ -784,6 +784,14 @@ export default function App() {
   const [selectedPiers, setSelectedPiers] = useState([]);
   const [tab, setTab]                   = useState("table");
   const [helpOpen, setHelpOpen]         = useState(false);
+  const helpRef = useRef(null);
+
+  useEffect(()=>{
+    if(!helpOpen) return;
+    const handler = e=>{ if(helpRef.current && !helpRef.current.contains(e.target)) setHelpOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return ()=>document.removeEventListener("mousedown", handler);
+  },[helpOpen]);
 
   const requiredPiers = SHAPES.find(s=>s.key===shape)?.piers||0;
   const pierOpts = story ? (options?.story_piers?.[story]||[]) : (options?.pier_options||[]);
@@ -885,13 +893,14 @@ export default function App() {
         justifyContent:"space-between",padding:"0 28px",position:"sticky",top:0,zIndex:100,
         boxShadow:"0 2px 8px rgba(0,0,0,0.18)"}}>
         <div />
-        <div style={{position:"relative"}} onMouseEnter={()=>setHelpOpen(true)} onMouseLeave={(e)=>{if(!e.currentTarget.contains(e.relatedTarget))setHelpOpen(false)}}>
-          <span style={{color:"#fff",cursor:"default",fontSize:15,fontWeight:500,letterSpacing:"0.03em"}}>
+        <div ref={helpRef} style={{position:"relative"}}>
+          <span onClick={()=>setHelpOpen(o=>!o)}
+            style={{color:"#fff",cursor:"pointer",fontSize:15,fontWeight:500,letterSpacing:"0.03em",
+              padding:"4px 8px",borderRadius:4,background:helpOpen?"rgba(255,255,255,0.15)":"transparent"}}>
             Help
           </span>
           {helpOpen&&(
-            <div style={{position:"absolute",right:0,top:28,paddingTop:12,width:360,zIndex:300}}
-              onMouseLeave={()=>setHelpOpen(false)}>
+            <div style={{position:"absolute",right:0,top:36,paddingTop:4,width:360,zIndex:300}}>
             <div style={{background:"#fff",
               border:"1px solid "+C.b,borderRadius:8,boxShadow:"0 6px 20px rgba(0,0,0,0.15)",
               padding:16,fontSize:13,color:P}}>
