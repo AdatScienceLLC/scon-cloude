@@ -746,14 +746,16 @@ export default function App() {
         justifyContent:"space-between",padding:"0 28px",position:"sticky",top:0,zIndex:100,
         boxShadow:"0 2px 8px rgba(0,0,0,0.18)"}}>
         <div />
-        <div style={{position:"relative"}} onMouseEnter={()=>setHelpOpen(true)} onMouseLeave={()=>setHelpOpen(false)}>
+        <div style={{position:"relative"}} onMouseEnter={()=>setHelpOpen(true)} onMouseLeave={(e)=>{if(!e.currentTarget.contains(e.relatedTarget))setHelpOpen(false)}}>
           <span style={{color:"#fff",cursor:"default",fontSize:15,fontWeight:500,letterSpacing:"0.03em"}}>
             Help
           </span>
           {helpOpen&&(
-            <div style={{position:"absolute",right:0,top:40,width:360,background:"#fff",
+            <div style={{position:"absolute",right:0,top:28,paddingTop:12,width:360,zIndex:300}}
+              onMouseLeave={()=>setHelpOpen(false)}>
+            <div style={{background:"#fff",
               border:"1px solid "+C.b,borderRadius:8,boxShadow:"0 6px 20px rgba(0,0,0,0.15)",
-              padding:16,fontSize:13,color:P,zIndex:300}}>
+              padding:16,fontSize:13,color:P}}>
               <div style={{position:"absolute",right:12,top:-8,width:14,height:14,
                 background:"#fff",border:"1px solid "+C.b,transform:"rotate(45deg)",
                 borderBottom:"none",borderRight:"none"}} />
@@ -769,6 +771,7 @@ export default function App() {
                   </a>
                 </li>
               </ul>
+            </div>
             </div>
           )}
         </div>
