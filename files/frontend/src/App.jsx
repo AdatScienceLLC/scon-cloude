@@ -619,97 +619,140 @@ function OverviewGraphs({ graphs }) {
   );
 }
 
-/* ── AI Insights Footer ─────────────────────────────────── */
-function AIInsightsFooter({ graphs }) {
+/* ── AI Indicator Tab ───────────────────────────────────── */
+function AIIndicatorTab({ graphs }) {
   if (!graphs) return null;
 
   const insights = [];
 
-  // V2 — highest demand pier
   const v2gov = graphs.V2?.governing;
   if (v2gov?.piers?.length) {
     const idx = v2gov.values.reduce((mi,v,i)=>Math.abs(v)>Math.abs(v2gov.values[mi])?i:mi, 0);
-    insights.push({
-      icon:"⚡",
-      label:"Critical V2 Pier",
-      value:`${v2gov.piers[idx]}`,
-      detail:`${Math.abs(v2gov.values[idx]).toFixed(0)} kip — ${v2gov.cases[idx]}`,
-    });
+    insights.push({ icon:"⚡", label:"Critical Shear (V2) Pier", value:v2gov.piers[idx],
+      detail:`Max |V2| = ${Math.abs(v2gov.values[idx]).toFixed(0)} kip`, case:v2gov.cases[idx],
+      color:"#1d4ed8", bg:"#eff6ff" });
   }
 
-  // M3 — highest moment pier
   const m3gov = graphs.M3?.governing;
   if (m3gov?.piers?.length) {
     const idx = m3gov.values.reduce((mi,v,i)=>Math.abs(v)>Math.abs(m3gov.values[mi])?i:mi, 0);
-    insights.push({
-      icon:"🔩",
-      label:"Critical M3 Pier",
-      value:`${m3gov.piers[idx]}`,
-      detail:`${Math.abs(m3gov.values[idx]).toFixed(0)} kip-ft — ${m3gov.cases[idx]}`,
-    });
+    insights.push({ icon:"🔩", label:"Critical Moment (M3) Pier", value:m3gov.piers[idx],
+      detail:`Max |M3| = ${Math.abs(m3gov.values[idx]).toFixed(0)} kip-ft`, case:m3gov.cases[idx],
+      color:"#7c3aed", bg:"#f5f3ff" });
   }
 
-  // P — max tension & max compression
   const pgov = graphs.P?.governing;
   if (pgov?.piers?.length) {
     if (pgov.max_values?.length) {
       const idx = pgov.max_values.reduce((mi,v,i)=>v>pgov.max_values[mi]?i:mi, 0);
-      insights.push({
-        icon:"↑",
-        label:"Max Tension",
-        value:`${pgov.piers[idx]}`,
-        detail:`${pgov.max_values[idx].toFixed(0)} kip — ${pgov.max_cases[idx]}`,
-      });
+      insights.push({ icon:"↑", label:"Max Tension Pier", value:pgov.piers[idx],
+        detail:`P = +${pgov.max_values[idx].toFixed(0)} kip (tension)`, case:pgov.max_cases[idx],
+        color:"#b45309", bg:"#fffbeb" });
     }
     if (pgov.min_values?.length) {
       const idx = pgov.min_values.reduce((mi,v,i)=>v<pgov.min_values[mi]?i:mi, 0);
-      insights.push({
-        icon:"↓",
-        label:"Max Compression",
-        value:`${pgov.piers[idx]}`,
-        detail:`${pgov.min_values[idx].toFixed(0)} kip — ${pgov.min_cases[idx]}`,
-      });
+      insights.push({ icon:"↓", label:"Max Compression Pier", value:pgov.piers[idx],
+        detail:`P = ${pgov.min_values[idx].toFixed(0)} kip (compression)`, case:pgov.min_cases[idx],
+        color:"#be123c", bg:"#fff1f2" });
     }
   }
 
-  // Governing load case frequency
-  const allCases = [
-    ...(v2gov?.cases||[]),
-    ...(m3gov?.cases||[]),
-    ...(pgov?.max_cases||[]),
-    ...(pgov?.min_cases||[]),
-  ];
+  const allCases = [...(v2gov?.cases||[]),...(m3gov?.cases||[]),...(pgov?.max_cases||[]),...(pgov?.min_cases||[])];
+  let dominantCase = null;
   if (allCases.length) {
     const freq = {};
     allCases.forEach(c=>{ freq[c]=(freq[c]||0)+1; });
     const top = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0];
-    insights.push({
-      icon:"📋",
-      label:"Dominant Load Case",
-      value:top[0],
-      detail:`Governs ${top[1]} of ${allCases.length} critical checks`,
-    });
+    dominantCase = { name:top[0], count:top[1], total:allCases.length };
   }
 
+  // Per-pier summary table
+  const pierSet = new Set([...(v2gov?.piers||[]),...(m3gov?.piers||[]),...(pgov?.piers||[])]);
+  const pierRows = [...pierSet].map(pier => {
+    const v2i = v2gov?.piers?.indexOf(pier);
+    const m3i = m3gov?.piers?.indexOf(pier);
+    const pi  = pgov?.piers?.indexOf(pier);
+    return {
+      pier,
+      v2: v2i>=0 ? Math.abs(v2gov.values[v2i]).toFixed(0) : "—",
+      v2c: v2i>=0 ? v2gov.cases[v2i] : "—",
+      m3: m3i>=0 ? Math.abs(m3gov.values[m3i]).toFixed(0) : "—",
+      m3c: m3i>=0 ? m3gov.cases[m3i] : "—",
+      pt: pi>=0 && pgov.max_values ? pgov.max_values[pi].toFixed(0) : "—",
+      pc: pi>=0 && pgov.min_values ? pgov.min_values[pi].toFixed(0) : "—",
+    };
+  });
+
+  const th = {padding:"8px 12px",fontSize:12,fontWeight:700,color:"#fff",background:P,textAlign:"left",whiteSpace:"nowrap"};
+  const td = {padding:"7px 12px",fontSize:12,color:C.t,borderBottom:"1px solid "+C.b};
+  const tdc = {padding:"7px 12px",fontSize:11,color:C.m,borderBottom:"1px solid "+C.b};
+
   return (
-    <div style={{borderTop:"2px solid "+C.b,background:"#f8fafc",padding:"12px 24px"}}>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-        <span style={{background:P,color:"#fff",fontSize:10,fontWeight:700,
-          padding:"2px 8px",borderRadius:12,letterSpacing:"0.08em"}}>✦ AI INSIGHTS</span>
-        <span style={{fontSize:12,color:C.m}}>Key observations from your pier force data</span>
+    <div style={{padding:24}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
+        <span style={{background:P,color:"#fff",fontSize:11,fontWeight:700,
+          padding:"3px 10px",borderRadius:12,letterSpacing:"0.08em"}}>✦ AI INDICATOR</span>
+        <span style={{fontSize:13,color:C.m}}>Automated insights derived from governing pier force data</span>
       </div>
-      <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+
+      {/* Insight cards */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:14,marginBottom:24}}>
         {insights.map((ins,i)=>(
-          <div key={i} style={{background:"#fff",border:"1px solid "+C.b,borderRadius:8,
-            padding:"8px 14px",minWidth:180,flex:"1 1 180px",
-            boxShadow:"0 1px 4px rgba(39,67,101,0.07)"}}>
-            <div style={{fontSize:11,color:C.m,fontWeight:600,marginBottom:3,letterSpacing:"0.04em"}}>
+          <div key={i} style={{background:ins.bg,border:"1px solid "+C.b,borderRadius:10,
+            padding:"14px 16px",boxShadow:"0 1px 4px rgba(39,67,101,0.08)"}}>
+            <div style={{fontSize:11,color:ins.color,fontWeight:700,marginBottom:6,letterSpacing:"0.05em"}}>
               {ins.icon} {ins.label}
             </div>
-            <div style={{fontSize:15,fontWeight:700,color:P}}>{ins.value}</div>
-            <div style={{fontSize:11,color:C.m,marginTop:2}}>{ins.detail}</div>
+            <div style={{fontSize:22,fontWeight:800,color:ins.color,marginBottom:4}}>{ins.value}</div>
+            <div style={{fontSize:12,color:C.t,fontWeight:500}}>{ins.detail}</div>
+            <div style={{fontSize:11,color:C.m,marginTop:3}}>Case: <b>{ins.case}</b></div>
           </div>
         ))}
+        {dominantCase&&(
+          <div style={{background:"#f0fdf4",border:"1px solid "+C.b,borderRadius:10,
+            padding:"14px 16px",boxShadow:"0 1px 4px rgba(39,67,101,0.08)"}}>
+            <div style={{fontSize:11,color:"#15803d",fontWeight:700,marginBottom:6,letterSpacing:"0.05em"}}>
+              📋 Dominant Load Case
+            </div>
+            <div style={{fontSize:22,fontWeight:800,color:"#15803d",marginBottom:4}}>{dominantCase.name}</div>
+            <div style={{fontSize:12,color:C.t,fontWeight:500}}>
+              Governs {dominantCase.count} of {dominantCase.total} critical checks
+            </div>
+            <div style={{fontSize:11,color:C.m,marginTop:3}}>
+              {((dominantCase.count/dominantCase.total)*100).toFixed(0)}% dominance across all forces
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Per-pier summary table */}
+      <div style={{fontSize:13,fontWeight:700,color:P,marginBottom:8}}>Pier-by-Pier Governing Summary</div>
+      <div style={{overflowX:"auto",borderRadius:8,boxShadow:"0 1px 6px rgba(39,67,101,0.08)"}}>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead>
+            <tr>
+              <th style={th}>Pier</th>
+              <th style={th}>Max |V2| (kip)</th><th style={th}>V2 Case</th>
+              <th style={th}>Max |M3| (kip-ft)</th><th style={th}>M3 Case</th>
+              <th style={th}>Max P+ (kip)</th>
+              <th style={th}>Min P− (kip)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pierRows.map((r,i)=>(
+              <tr key={r.pier} style={{background:i%2===0?"#fff":"#f8fafc"}}>
+                <td style={{...td,fontWeight:700,color:P}}>{r.pier}</td>
+                <td style={td}>{r.v2}</td><td style={tdc}>{r.v2c}</td>
+                <td style={td}>{r.m3}</td><td style={tdc}>{r.m3c}</td>
+                <td style={td}>{r.pt}</td>
+                <td style={td}>{r.pc}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{fontSize:11,color:C.m,marginTop:10,fontStyle:"italic"}}>
+        Results are for reference only — please verify before use.
       </div>
     </div>
   );
@@ -1053,7 +1096,7 @@ export default function App() {
             <>
               {/* Tab bar */}
               <div style={{display:"flex",alignItems:"center",borderBottom:"2px solid "+C.b,marginBottom:16}}>
-                {[{key:"table",label:"Scon Table"},{key:"graphs",label:"Graphs"}].map(t=>(
+                {[{key:"table",label:"Scon Table"},{key:"graphs",label:"Graphs"},{key:"ai",label:"✦ AI Indicator"}].map(t=>(
                   <button key={t.key} onClick={()=>setTab(t.key)}
                     style={{padding:"10px 22px",fontSize:14,fontWeight:tab===t.key?700:400,
                       border:"none",background:"none",cursor:"pointer",
@@ -1068,10 +1111,10 @@ export default function App() {
                 onDownloadCSV={()=>download("csv")}
                 onDownloadXLSX={()=>download("xlsx")} />}
               {tab==="graphs"&&<OverviewGraphs graphs={options.overview_graphs} />}
+              {tab==="ai"&&<AIIndicatorTab graphs={options.overview_graphs} />}
             </>
           )}
         </div>
-        {options && <AIInsightsFooter graphs={options.overview_graphs} />}
         </div>
       </div>
     </>
