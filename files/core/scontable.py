@@ -38,9 +38,7 @@ def _clean_pier_df(df):
     return df
 
 
-def get_stories_and_piers(file_path):
-    df = read_pier_forces(file_path)
-    # Natural sort descending (roof → ground) for dropdowns
+def get_stories_and_piers_from_df(df):
     stories = sorted(df["Story"].dropna().unique().tolist(), key=_nsort, reverse=True)
     piers = sorted(df["Pier"].dropna().unique().tolist())
     story_piers = {
@@ -49,11 +47,8 @@ def get_stories_and_piers(file_path):
     }
     return stories, piers, story_piers
 
-
-def get_piers_for_story(file_path, story):
-    df = read_pier_forces(file_path)
-    piers = sorted(df[df["Story"] == story]["Pier"].dropna().unique().tolist())
-    return piers
+def get_stories_and_piers(file_path):
+    return get_stories_and_piers_from_df(read_pier_forces(file_path))
 
 
 def read_units(file_path):
@@ -89,8 +84,33 @@ def read_units(file_path):
         return {}
 
 
-def build_table(file_path, story, piers):
-    df = read_pier_forces(file_path)
+def read_units_from_df(file_path, df):
+    try:
+        xl = pd.ExcelFile(file_path)
+        for sheet in xl.sheet_names:
+            for hdr in range(5):
+                try:
+                    tmp = pd.read_excel(file_path, sheet_name=sheet, header=hdr, nrows=1)
+                    if REQUIRED_COLS.issubset(set(tmp.columns)):
+                        units = {}
+                        for col in ["P", "V2", "M3"]:
+                            if col in tmp.columns:
+                                val = tmp[col].iloc[0]
+                                if pd.notna(val):
+                                    s = str(val).strip()
+                                    try:
+                                        float(s)
+                                    except ValueError:
+                                        if s:
+                                            units[col] = s
+                        return units
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    return {}
+
+def build_table_from_df(df, story, piers):
     df_story = df[df["Story"] == story]
     if not piers:
         return [], [], None
@@ -112,10 +132,8 @@ def build_table(file_path, story, piers):
     return piers, rows, df_export
 
 
-def build_overview_graphs(file_path):
-    df_all = read_pier_forces(file_path)
-
-    # Exclude non-floor labels (EMR, BKRF, etc.) — keep any story containing a digit or hyphen-number
+def build_overview_graphs_from_df(df_all):
+    # Exclude non-floor labels (EMR, BKRF, etc.) — keep any story containing a digit
     stories_asc  = sorted(
         [s for s in df_all["Story"].unique().tolist() if any(c.isdigit() for c in str(s))],
         key=_nsort

@@ -10,7 +10,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .scontable import get_stories_and_piers, build_table, build_overview_graphs, read_units
+from .scontable import read_pier_forces, get_stories_and_piers_from_df, build_table_from_df, build_overview_graphs_from_df, read_units_from_df
 
 ALLOWED_EXTENSIONS = {".xlsx"}
 
@@ -44,18 +44,19 @@ class UploadView(APIView):
 
         file_path, storage_name = save_upload(file)
         try:
-            stories, all_piers, story_piers = get_stories_and_piers(file_path)
+            df = read_pier_forces(file_path)
+            stories, all_piers, story_piers = get_stories_and_piers_from_df(df)
             story = request.POST.get("story")
             piers_selected_raw = request.POST.get("piers")
             piers_selected = json.loads(piers_selected_raw) if piers_selected_raw else []
 
-            overview = build_overview_graphs(file_path)
-            units = read_units(file_path)
+            overview = build_overview_graphs_from_df(df)
+            units = read_units_from_df(file_path, df)
 
             table_piers, table_data = [], []
 
             if story and piers_selected:
-                table_piers, table_data, _ = build_table(file_path, story, piers_selected)
+                table_piers, table_data, _ = build_table_from_df(df, story, piers_selected)
 
             return Response({
                 "story_options": stories,
