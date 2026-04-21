@@ -1,0 +1,20 @@
+[Unit]
+Description=ETABS Pier Viewer - Gunicorn
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/scon
+EnvironmentFile=/var/www/scon/.env
+ExecStart=/var/www/scon/venv/bin/gunicorn \
+    --workers 2 \
+    --bind 127.0.0.1:8000 \
+    --timeout 120 \
+    --access-logfile /var/log/gunicorn/access.log \
+    --error-logfile /var/log/gunicorn/error.log \
+    scon.wsgi:application
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

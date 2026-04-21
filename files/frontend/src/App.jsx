@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 
-const API_URL = "/api/upload/";
+const BASE = import.meta.env.PROD ? "/shear_walls" : "";
+const API_URL = `${BASE}/api/upload/`;
 const P = "#274365";
 const C = { a:P, bg:"#f0f4f8", card:"#ffffff", b:"#dde3ea", t:"#222831", m:"#6b7280", d:"#dc2626" };
 const SHAPES = [
@@ -707,7 +708,7 @@ export default function App() {
     form.append("piers",JSON.stringify(selectedPiers));
     form.append("format",fmt);
     try {
-      const res = await fetch("/api/export/",{method:"POST",body:form});
+      const res = await fetch(`${BASE}/api/export/`,{method:"POST",body:form});
       if(!res.ok){ const j=await res.json(); setError(j.detail||"Export failed"); return; }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -762,7 +763,7 @@ export default function App() {
                 <li>Select story, shape and piers, then click <b>Generate Scon Input Loads</b></li>
                 <li>
                   Download sample file:&nbsp;
-                  <a href="/static/sample_pier_forces.xlsx" download
+                  <a href={`${BASE}/static/sample_pier_forces.xlsx`} download
                     style={{color:P,fontWeight:700}}>
                     Click to Download
                   </a>
