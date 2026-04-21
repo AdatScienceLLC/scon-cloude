@@ -829,6 +829,7 @@ export default function App() {
       const res = await fetch(API_URL,{method:"POST",body:form});
       const json = await res.json();
       if(!res.ok) throw new Error(json.detail||"Error");
+      setOptions(prev=>({...prev, ...json}));
       setResult(json); setTab("table");
     } catch(e){ setError(e.message); }
     finally { setLoading(false); }

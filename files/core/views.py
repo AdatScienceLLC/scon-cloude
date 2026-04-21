@@ -50,20 +50,24 @@ class UploadView(APIView):
             piers_selected_raw = request.POST.get("piers")
             piers_selected = json.loads(piers_selected_raw) if piers_selected_raw else []
 
-            overview = build_overview_graphs_from_df(df)
             units = read_units_from_df(file_path, df)
-
-            table_piers, table_data = [], []
 
             if story and piers_selected:
                 table_piers, table_data, _ = build_table_from_df(df, story, piers_selected)
+                return Response({
+                    "story_options": stories,
+                    "pier_options": all_piers,
+                    "story_piers": story_piers,
+                    "table": {"piers": table_piers, "data": table_data, "units": units},
+                }, status=status.HTTP_200_OK)
 
+            overview = build_overview_graphs_from_df(df)
             return Response({
                 "story_options": stories,
                 "pier_options": all_piers,
                 "story_piers": story_piers,
                 "overview_graphs": overview,
-                "table": {"piers": table_piers, "data": table_data, "units": units} if table_piers else None,
+                "table": None,
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
