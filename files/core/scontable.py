@@ -10,8 +10,20 @@ def _nsort(s):
     return [int(c) if c.isdigit() else c.lower() for c in re.split(r"(\d+)", s)]
 
 
+def _find_sheet(file_path):
+    xl = pd.ExcelFile(file_path)
+    names = xl.sheet_names
+    for name in names:
+        if "pier" in name.lower() and "force" in name.lower():
+            return name
+    for name in names:
+        if "pier" in name.lower():
+            return name
+    return names[0]
+
 def read_pier_forces(file_path):
-    df = pd.read_excel(file_path, sheet_name="Pier Forces", header=1, index_col=None)
+    sheet = _find_sheet(file_path)
+    df = pd.read_excel(file_path, sheet_name=sheet, header=1, index_col=None)
     df = df[["Story", "Pier", "Output Case", "Location", "P", "V2", "M3"]]
     df = df[df["Location"] == "Bottom"].copy()
     df["Story"] = df["Story"].astype(str)
@@ -41,7 +53,7 @@ def get_piers_for_story(file_path, story):
 
 def read_units(file_path):
     try:
-        df_raw = pd.read_excel(file_path, sheet_name="Pier Forces", header=1, nrows=1)
+        df_raw = pd.read_excel(file_path, sheet_name=_find_sheet(file_path), header=1, nrows=1)
         units = {}
         for col in ["P", "V2", "M3"]:
             if col in df_raw.columns:
