@@ -18,7 +18,7 @@ def read_pier_forces(file_path):
     for sheet in xl.sheet_names:
         for hdr in range(5):
             try:
-                df = pd.read_excel(file_path, sheet_name=sheet, header=hdr, index_col=None)
+                df = pd.read_excel(file_path, sheet_name=sheet, header=hdr, index_col=None, engine="calamine")
                 if REQUIRED_COLS.issubset(set(df.columns)):
                     return _clean_pier_df(df)
             except Exception:
