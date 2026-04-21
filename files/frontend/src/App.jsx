@@ -756,9 +756,6 @@ export default function App() {
             <div style={{background:"#fff",
               border:"1px solid "+C.b,borderRadius:8,boxShadow:"0 6px 20px rgba(0,0,0,0.15)",
               padding:16,fontSize:13,color:P}}>
-              <div style={{position:"absolute",right:12,top:-8,width:14,height:14,
-                background:"#fff",border:"1px solid "+C.b,transform:"rotate(45deg)",
-                borderBottom:"none",borderRight:"none"}} />
               <ul style={{margin:0,paddingLeft:20,lineHeight:2.2,color:P,fontWeight:500}}>
                 <li>Compatible with ETABS Pier Forces export (.xlsx)</li>
                 <li>Database Units should be Kip – Ft</li>
