@@ -4,7 +4,11 @@
       "Bash(gh auth *)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(cp \"C:/Users/Adatt/.ssh/id_ed25519\" /tmp/deploy_key)",
+      "Bash(chmod 600 /tmp/deploy_key)",
+      "Bash(ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no root@67.207.95.96 \"echo connected && whoami\")",
+      "Read(//c//**)"
     ]
   }
 }

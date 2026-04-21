@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: process.env.NODE_ENV === 'production' ? '/shear_walls/' : '/',
+  base: process.env.NODE_ENV === 'production' ? '/piers/' : '/',
   server: {
     proxy: {
       '/api': 'http://127.0.0.1:8001',

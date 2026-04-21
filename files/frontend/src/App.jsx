@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 
-const BASE = import.meta.env.PROD ? "/shear_walls" : "";
+const BASE = import.meta.env.PROD ? "/piers" : "";
 const API_URL = `${BASE}/api/upload/`;
 const P = "#274365";
 const C = { a:P, bg:"#f0f4f8", card:"#ffffff", b:"#dde3ea", t:"#222831", m:"#6b7280", d:"#dc2626" };
