@@ -38,6 +38,22 @@ def _clean_pier_df(df):
     return df
 
 
+def read_pier_forces_light(file_path):
+    """Fast metadata-only read: returns (stories, piers, story_piers) without loading P/V2/M3."""
+    xl = pd.ExcelFile(file_path)
+    for sheet in xl.sheet_names:
+        for hdr in range(5):
+            try:
+                df = pd.read_excel(file_path, sheet_name=sheet, header=hdr,
+                                   usecols=lambda c: c in {"Story","Pier","Location"},
+                                   engine="calamine", dtype=str)
+                if {"Story","Pier","Location"}.issubset(set(df.columns)):
+                    df = df[df["Location"]=="Bottom"].copy()
+                    return get_stories_and_piers_from_df(df)
+            except Exception:
+                continue
+    raise ValueError("Could not find Story/Pier/Location columns.")
+
 def get_stories_and_piers_from_df(df):
     stories = sorted(df["Story"].dropna().unique().tolist(), key=_nsort, reverse=True)
     piers = sorted(df["Pier"].dropna().unique().tolist())

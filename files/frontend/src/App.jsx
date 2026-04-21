@@ -778,6 +778,20 @@ export default function App() {
   const [error, setError]         = useState(null);
   const [options, setOptions]     = useState(null);
   const [result, setResult]       = useState(null);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+
+  const loadOverview = useCallback(async(f)=>{
+    if(!f) return;
+    setOverviewLoading(true);
+    const form = new FormData();
+    form.append("lateral_loads_file", f);
+    try {
+      const res = await fetch(`${BASE}/api/overview/`, {method:"POST", body:form});
+      const json = await res.json();
+      if(res.ok) setOptions(prev=>({...prev, ...json}));
+    } catch(e){}
+    finally { setOverviewLoading(false); }
+  },[]);
 
   const [shape, setShape]               = useState("");
   const [story, setStory]               = useState("");
@@ -1107,7 +1121,7 @@ export default function App() {
               {/* Tab bar */}
               <div style={{display:"flex",alignItems:"center",borderBottom:"2px solid "+C.b,marginBottom:16}}>
                 {[{key:"table",label:"Scon Table"},{key:"graphs",label:"Graphs"},{key:"ai",label:"✦ AI Indicator"}].map(t=>(
-                  <button key={t.key} onClick={()=>setTab(t.key)}
+                  <button key={t.key} onClick={()=>{ setTab(t.key); if((t.key==="graphs"||t.key==="ai")&&!options?.overview_graphs) loadOverview(file); }}
                     style={{padding:"10px 22px",fontSize:14,fontWeight:tab===t.key?700:400,
                       border:"none",background:"none",cursor:"pointer",
                       borderBottom:tab===t.key?"2px solid "+P:"2px solid transparent",
@@ -1120,8 +1134,18 @@ export default function App() {
               {tab==="table"&&<Table data={result.table}
                 onDownloadCSV={()=>download("csv")}
                 onDownloadXLSX={()=>download("xlsx")} />}
-              {tab==="graphs"&&<OverviewGraphs graphs={options.overview_graphs} />}
-              {tab==="ai"&&<AIIndicatorTab graphs={options.overview_graphs} />}
+              {tab==="graphs"&&(overviewLoading
+                ? <div style={{display:"flex",alignItems:"center",gap:10,padding:40,color:C.m}}>
+                    <div style={{width:16,height:16,border:"2px solid "+C.b,borderTop:"2px solid "+P,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+                    Analysing full dataset for graphs — this may take a moment for large files…
+                  </div>
+                : <OverviewGraphs graphs={options?.overview_graphs} />)}
+              {tab==="ai"&&(overviewLoading
+                ? <div style={{display:"flex",alignItems:"center",gap:10,padding:40,color:C.m}}>
+                    <div style={{width:16,height:16,border:"2px solid "+C.b,borderTop:"2px solid "+P,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+                    Computing AI insights…
+                  </div>
+                : <AIIndicatorTab graphs={options?.overview_graphs} />)}
             </>
           )}
         </div>
