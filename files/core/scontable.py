@@ -10,20 +10,25 @@ def _nsort(s):
     return [int(c) if c.isdigit() else c.lower() for c in re.split(r"(\d+)", s)]
 
 
-def _find_sheet(file_path):
-    xl = pd.ExcelFile(file_path)
-    names = xl.sheet_names
-    for name in names:
-        if "pier" in name.lower() and "force" in name.lower():
-            return name
-    for name in names:
-        if "pier" in name.lower():
-            return name
-    return names[0]
+REQUIRED_COLS = {"Story", "Pier", "Output Case", "Location", "P", "V2", "M3"}
 
 def read_pier_forces(file_path):
-    sheet = _find_sheet(file_path)
-    df = pd.read_excel(file_path, sheet_name=sheet, header=1, index_col=None)
+    xl = pd.ExcelFile(file_path)
+    # Try every sheet and every likely header row
+    for sheet in xl.sheet_names:
+        for hdr in range(5):
+            try:
+                df = pd.read_excel(file_path, sheet_name=sheet, header=hdr, index_col=None)
+                if REQUIRED_COLS.issubset(set(df.columns)):
+                    return _clean_pier_df(df)
+            except Exception:
+                continue
+    raise ValueError(
+        f"Could not find a sheet with columns {REQUIRED_COLS}. "
+        f"Sheets found: {xl.sheet_names}"
+    )
+
+def _clean_pier_df(df):
     df = df[["Story", "Pier", "Output Case", "Location", "P", "V2", "M3"]]
     df = df[df["Location"] == "Bottom"].copy()
     df["Story"] = df["Story"].astype(str)
@@ -53,7 +58,21 @@ def get_piers_for_story(file_path, story):
 
 def read_units(file_path):
     try:
-        df_raw = pd.read_excel(file_path, sheet_name=_find_sheet(file_path), header=1, nrows=1)
+        xl = pd.ExcelFile(file_path)
+        df_raw = None
+        for sheet in xl.sheet_names:
+            for hdr in range(5):
+                try:
+                    tmp = pd.read_excel(file_path, sheet_name=sheet, header=hdr, nrows=1)
+                    if REQUIRED_COLS.issubset(set(tmp.columns)):
+                        df_raw = tmp
+                        break
+                except Exception:
+                    continue
+            if df_raw is not None:
+                break
+        if df_raw is None:
+            return {}
         units = {}
         for col in ["P", "V2", "M3"]:
             if col in df_raw.columns:
