@@ -132,169 +132,152 @@ def build_table_from_df(df, story, piers):
     return piers, rows, df_export
 
 
+def _rnd(v):
+    try:
+        f = float(v)
+        return round(f, 1) if f == f else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+def _vec_governing(df_sub, col, use_abs=True):
+    """Vectorized: find governing case per pier for a force column."""
+    work = df_sub[["Pier", "Output Case", col]].copy()
+    work["_v"] = work[col].abs() if use_abs else work[col]
+    idx = work.groupby("Pier")["_v"].idxmax()
+    res = work.loc[idx].sort_values("Pier").reset_index(drop=True)
+    return {
+        "piers":  res["Pier"].tolist(),
+        "cases":  res["Output Case"].tolist(),
+        "values": [_rnd(v) for v in res["_v"].tolist()],
+    }
+
+def _vec_governing_p(df_sub):
+    """Vectorized: find max tension and max compression case per pier."""
+    work = df_sub[["Pier", "Output Case", "P"]]
+    idx_max = work.groupby("Pier")["P"].idxmax()
+    idx_min = work.groupby("Pier")["P"].idxmin()
+    rmax = work.loc[idx_max].sort_values("Pier").reset_index(drop=True)
+    rmin = work.loc[idx_min].sort_values("Pier").reset_index(drop=True)
+    return {
+        "piers":      rmax["Pier"].tolist(),
+        "max_cases":  rmax["Output Case"].tolist(),
+        "max_values": [_rnd(v) for v in rmax["P"].tolist()],
+        "min_cases":  rmin["Output Case"].tolist(),
+        "min_values": [_rnd(v) for v in rmin["P"].tolist()],
+    }
+
 def build_overview_graphs_from_df(df_all):
-    # Exclude non-floor labels (EMR, BKRF, etc.) — keep any story containing a digit
-    stories_asc  = sorted(
+    stories_asc = sorted(
         [s for s in df_all["Story"].unique().tolist() if any(c.isdigit() for c in str(s))],
         key=_nsort
     )
     stories_desc = list(reversed(stories_asc))
-
-    # Use only numeric stories for all graph computations
     df = df_all[df_all["Story"].isin(stories_asc)].copy()
     piers = sorted(df["Pier"].unique().tolist())
 
-    def max_abs(s):
-        return s.abs().max()
-
-    def _rnd(v):
-        try:
-            f = float(v)
-            return round(f, 1) if f == f else 0.0  # guard NaN
-        except (TypeError, ValueError):
-            return 0.0
-
-    # Global per-pier maxima (P uses signed max/min; V2/M3 use abs max)
-    pier_p_max  = [_rnd(df[df["Pier"] == p]["P"].max())        for p in piers]
-    pier_p_min  = [_rnd(df[df["Pier"] == p]["P"].min())        for p in piers]
-    pier_v2_max = [_rnd(df[df["Pier"] == p]["V2"].abs().max()) for p in piers]
-    pier_m3_max = [_rnd(df[df["Pier"] == p]["M3"].abs().max()) for p in piers]
-
-    # Story profiles — lines, Y axis in ascending order so ground is at bottom
-    def make_profile(col):
-        return [
-            {
-                "name": p,
-                "x": [_rnd(v) for v in df[df["Pier"] == p].groupby("Story")[col]
-                       .apply(max_abs).reindex(stories_asc).fillna(0).tolist()],
-                "y": stories_asc,
-                "type": "scatter",
-                "mode": "lines+markers",
-                "marker": {"size": 6},
-            }
-            for p in piers
-        ]
-
-    # Pier share pie — global and per story
     def _pie(piers_s, vals):
         return [{"values": vals, "labels": piers_s, "type": "pie", "hole": 0.45,
                  "textinfo": "label+percent",
                  "hovertemplate": "%{label}: %{value:.1f} kips (%{percent})<extra></extra>"}]
 
+    # ── Single grouped aggregation replaces all per-pier loops ──
+    df["_v2a"] = df["V2"].abs()
+    df["_m3a"] = df["M3"].abs()
+    grp_pier = df.groupby("Pier").agg(
+        v2_max=("_v2a", "max"), m3_max=("_m3a", "max"),
+        p_max=("P", "max"),    p_min=("P", "min"),
+    ).reindex(piers)
+
+    grp_story_pier = df.groupby(["Story", "Pier"]).agg(
+        v2_max=("_v2a", "max"), m3_max=("_m3a", "max"),
+        p_max=("P", "max"),    p_min=("P", "min"),
+    )
+
+    pier_v2_max = [_rnd(v) for v in grp_pier["v2_max"].tolist()]
+    pier_m3_max = [_rnd(v) for v in grp_pier["m3_max"].tolist()]
+    pier_p_max  = [_rnd(v) for v in grp_pier["p_max"].tolist()]
+    pier_p_min  = [_rnd(v) for v in grp_pier["p_min"].tolist()]
+
+    # Profile traces using pivot
+    def make_profile(col):
+        pivot = df.groupby(["Pier", "Story"])[col].apply(lambda s: s.abs().max()).unstack("Story").reindex(columns=stories_asc).fillna(0)
+        return [
+            {"name": p, "x": [_rnd(v) for v in pivot.loc[p].tolist()], "y": stories_asc,
+             "type": "scatter", "mode": "lines+markers", "marker": {"size": 6}}
+            for p in piers if p in pivot.index
+        ]
+
+    # Per-story envelope using grouped data
     pier_share_by_story = {}
     envelope_by_story   = {}
     for s in stories_desc:
-        df_s    = df[df["Story"] == s]
-        piers_s = sorted(df_s["Pier"].unique().tolist())
-        pier_share_by_story[s] = _pie(
-            piers_s,
-            [_rnd(df_s[df_s["Pier"] == p]["V2"].abs().max()) for p in piers_s],
-        )
+        try:
+            sg = grp_story_pier.loc[s].reset_index()
+        except KeyError:
+            continue
+        piers_s = sorted(sg["Pier"].tolist())
+        sg = sg.set_index("Pier").reindex(piers_s)
+        pier_share_by_story[s] = _pie(piers_s, [_rnd(v) for v in sg["v2_max"].tolist()])
         envelope_by_story[s] = {
-            "piers":  piers_s,
-            "p_max":  [_rnd(df_s[df_s["Pier"] == p]["P"].max())        for p in piers_s],
-            "p_min":  [_rnd(df_s[df_s["Pier"] == p]["P"].min())        for p in piers_s],
-            "v2":     [_rnd(df_s[df_s["Pier"] == p]["V2"].abs().max()) for p in piers_s],
-            "m3":     [_rnd(df_s[df_s["Pier"] == p]["M3"].abs().max()) for p in piers_s],
+            "piers": piers_s,
+            "p_max": [_rnd(v) for v in sg["p_max"].tolist()],
+            "p_min": [_rnd(v) for v in sg["p_min"].tolist()],
+            "v2":    [_rnd(v) for v in sg["v2_max"].tolist()],
+            "m3":    [_rnd(v) for v in sg["m3_max"].tolist()],
         }
 
+    # P-M scatter — sample to max 5000 points per pier to avoid huge payloads
     def make_pm_scatter():
-        return [
-            {
+        traces = []
+        for p in piers:
+            dp = df[df["Pier"] == p]
+            if len(dp) > 5000:
+                dp = dp.sample(5000, random_state=42)
+            traces.append({
                 "name": p,
-                "x": [_rnd(v) for v in df[df["Pier"] == p]["M3"].tolist()],
-                "y": [_rnd(v) for v in df[df["Pier"] == p]["P"].tolist()],
-                "text": df[df["Pier"] == p]["Output Case"].tolist(),
-                "type": "scatter",
-                "mode": "markers",
+                "x": [_rnd(v) for v in dp["M3"].tolist()],
+                "y": [_rnd(v) for v in dp["P"].tolist()],
+                "text": dp["Output Case"].tolist(),
+                "type": "scatter", "mode": "markers",
                 "marker": {"size": 9, "opacity": 0.8},
                 "hovertemplate": "<b>%{text}</b><br>P: %{y} kip<br>M3: %{x} kip-ft<extra>" + p + "</extra>",
-            }
-            for p in piers
-        ]
-
-    def make_governing(df_sub, piers_sub, col, use_abs=True):
-        rows = []
-        for p in piers_sub:
-            df_p = df_sub[df_sub["Pier"] == p]
-            if df_p.empty:
-                continue
-            series = df_p[col].abs() if use_abs else df_p[col]
-            idx = series.idxmax()
-            rows.append({
-                "pier":  p,
-                "case":  str(df_p.loc[idx, "Output Case"]),
-                "value": _rnd(float(series.max())),
             })
+        return traces
+
+    def make_force_dist(df_sub):
+        piers_sub = sorted(df_sub["Pier"].unique().tolist())
+        gs = df_sub.groupby("Pier").agg(
+            v2_max=(("V2"), lambda x: x.abs().max()),
+            m3_max=(("M3"), lambda x: x.abs().max()),
+            p_max=("P", "max"), p_min=("P", "min"),
+        ).reindex(piers_sub)
+        p_abs = [_rnd(max(abs(_rnd(mx)), abs(_rnd(mn)))) for mx, mn in zip(gs["p_max"], gs["p_min"])]
         return {
-            "piers":  [r["pier"]  for r in rows],
-            "cases":  [r["case"]  for r in rows],
-            "values": [r["value"] for r in rows],
+            "v2": {"pie": _pie(piers_sub, [_rnd(v) for v in gs["v2_max"].tolist()]),
+                   "governing": _vec_governing(df_sub, "V2")},
+            "m3": {"pie": _pie(piers_sub, [_rnd(v) for v in gs["m3_max"].tolist()]),
+                   "governing": _vec_governing(df_sub, "M3")},
+            "p":  {"pie": _pie(piers_sub, p_abs),
+                   "governing": _vec_governing_p(df_sub)},
         }
 
-    def make_governing_p(df_sub, piers_sub):
-        rows = []
-        for p in piers_sub:
-            df_p = df_sub[df_sub["Pier"] == p]
-            if df_p.empty:
-                continue
-            idx_max = df_p["P"].idxmax()
-            idx_min = df_p["P"].idxmin()
-            rows.append({
-                "pier":      p,
-                "max_case":  str(df_p.loc[idx_max, "Output Case"]),
-                "max_value": _rnd(float(df_p["P"].max())),
-                "min_case":  str(df_p.loc[idx_min, "Output Case"]),
-                "min_value": _rnd(float(df_p["P"].min())),
-            })
-        return {
-            "piers":      [r["pier"]      for r in rows],
-            "max_cases":  [r["max_case"]  for r in rows],
-            "max_values": [r["max_value"] for r in rows],
-            "min_cases":  [r["min_case"]  for r in rows],
-            "min_values": [r["min_value"] for r in rows],
-        }
-
-    def make_force_dist(df_sub, piers_sub):
-        p_abs = [_rnd(max(abs(_rnd(df_sub[df_sub["Pier"]==p]["P"].max())),
-                         abs(_rnd(df_sub[df_sub["Pier"]==p]["P"].min())))) for p in piers_sub]
-        return {
-            "v2": {
-                "pie":       _pie(piers_sub, [_rnd(df_sub[df_sub["Pier"]==p]["V2"].abs().max()) for p in piers_sub]),
-                "governing": make_governing(df_sub, piers_sub, "V2"),
-            },
-            "m3": {
-                "pie":       _pie(piers_sub, [_rnd(df_sub[df_sub["Pier"]==p]["M3"].abs().max()) for p in piers_sub]),
-                "governing": make_governing(df_sub, piers_sub, "M3"),
-            },
-            "p": {
-                "pie":       _pie(piers_sub, p_abs),
-                "governing": make_governing_p(df_sub, piers_sub),
-            },
-        }
+    force_dist_global   = make_force_dist(df_all)
+    force_dist_by_story = {s: make_force_dist(df[df["Story"] == s]) for s in stories_desc}
 
     pier_p_abs = [_rnd(max(abs(mx), abs(mn))) for mx, mn in zip(pier_p_max, pier_p_min)]
-
-    all_piers = sorted(df_all["Pier"].unique().tolist())
-    force_dist_global = make_force_dist(df_all, all_piers)
-    force_dist_by_story = {s: make_force_dist(df[df["Story"]==s], sorted(df[df["Story"]==s]["Pier"].unique().tolist())) for s in stories_desc}
 
     return {
         "pier_share": _pie(piers, pier_v2_max),
         "pier_share_by_story": pier_share_by_story,
         "envelope": {
-            "piers":  piers,
-            "p_max":  pier_p_max,
-            "p_min":  pier_p_min,
-            "v2":     pier_v2_max,
-            "m3":     pier_m3_max,
-            "by_story": envelope_by_story,
+            "piers": piers, "p_max": pier_p_max, "p_min": pier_p_min,
+            "v2": pier_v2_max, "m3": pier_m3_max, "by_story": envelope_by_story,
         },
         "force_dist": {**force_dist_global, "by_story": force_dist_by_story, "stories": stories_desc},
-        "v2_profile":  make_profile("V2"),
-        "m3_profile":  make_profile("M3"),
-        "p_profile":   make_profile("P"),
-        "pm_scatter":  make_pm_scatter(),
+        "v2_profile": make_profile("V2"),
+        "m3_profile": make_profile("M3"),
+        "p_profile":  make_profile("P"),
+        "pm_scatter": make_pm_scatter(),
     }
 
 
