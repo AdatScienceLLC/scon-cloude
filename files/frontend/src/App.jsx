@@ -619,6 +619,102 @@ function OverviewGraphs({ graphs }) {
   );
 }
 
+/* ── AI Insights Footer ─────────────────────────────────── */
+function AIInsightsFooter({ graphs }) {
+  if (!graphs) return null;
+
+  const insights = [];
+
+  // V2 — highest demand pier
+  const v2gov = graphs.V2?.governing;
+  if (v2gov?.piers?.length) {
+    const idx = v2gov.values.reduce((mi,v,i)=>Math.abs(v)>Math.abs(v2gov.values[mi])?i:mi, 0);
+    insights.push({
+      icon:"⚡",
+      label:"Critical V2 Pier",
+      value:`${v2gov.piers[idx]}`,
+      detail:`${Math.abs(v2gov.values[idx]).toFixed(0)} kip — ${v2gov.cases[idx]}`,
+    });
+  }
+
+  // M3 — highest moment pier
+  const m3gov = graphs.M3?.governing;
+  if (m3gov?.piers?.length) {
+    const idx = m3gov.values.reduce((mi,v,i)=>Math.abs(v)>Math.abs(m3gov.values[mi])?i:mi, 0);
+    insights.push({
+      icon:"🔩",
+      label:"Critical M3 Pier",
+      value:`${m3gov.piers[idx]}`,
+      detail:`${Math.abs(m3gov.values[idx]).toFixed(0)} kip-ft — ${m3gov.cases[idx]}`,
+    });
+  }
+
+  // P — max tension & max compression
+  const pgov = graphs.P?.governing;
+  if (pgov?.piers?.length) {
+    if (pgov.max_values?.length) {
+      const idx = pgov.max_values.reduce((mi,v,i)=>v>pgov.max_values[mi]?i:mi, 0);
+      insights.push({
+        icon:"↑",
+        label:"Max Tension",
+        value:`${pgov.piers[idx]}`,
+        detail:`${pgov.max_values[idx].toFixed(0)} kip — ${pgov.max_cases[idx]}`,
+      });
+    }
+    if (pgov.min_values?.length) {
+      const idx = pgov.min_values.reduce((mi,v,i)=>v<pgov.min_values[mi]?i:mi, 0);
+      insights.push({
+        icon:"↓",
+        label:"Max Compression",
+        value:`${pgov.piers[idx]}`,
+        detail:`${pgov.min_values[idx].toFixed(0)} kip — ${pgov.min_cases[idx]}`,
+      });
+    }
+  }
+
+  // Governing load case frequency
+  const allCases = [
+    ...(v2gov?.cases||[]),
+    ...(m3gov?.cases||[]),
+    ...(pgov?.max_cases||[]),
+    ...(pgov?.min_cases||[]),
+  ];
+  if (allCases.length) {
+    const freq = {};
+    allCases.forEach(c=>{ freq[c]=(freq[c]||0)+1; });
+    const top = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0];
+    insights.push({
+      icon:"📋",
+      label:"Dominant Load Case",
+      value:top[0],
+      detail:`Governs ${top[1]} of ${allCases.length} critical checks`,
+    });
+  }
+
+  return (
+    <div style={{borderTop:"2px solid "+C.b,background:"#f8fafc",padding:"12px 24px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+        <span style={{background:P,color:"#fff",fontSize:10,fontWeight:700,
+          padding:"2px 8px",borderRadius:12,letterSpacing:"0.08em"}}>✦ AI INSIGHTS</span>
+        <span style={{fontSize:12,color:C.m}}>Key observations from your pier force data</span>
+      </div>
+      <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+        {insights.map((ins,i)=>(
+          <div key={i} style={{background:"#fff",border:"1px solid "+C.b,borderRadius:8,
+            padding:"8px 14px",minWidth:180,flex:"1 1 180px",
+            boxShadow:"0 1px 4px rgba(39,67,101,0.07)"}}>
+            <div style={{fontSize:11,color:C.m,fontWeight:600,marginBottom:3,letterSpacing:"0.04em"}}>
+              {ins.icon} {ins.label}
+            </div>
+            <div style={{fontSize:15,fontWeight:700,color:P}}>{ins.value}</div>
+            <div style={{fontSize:11,color:C.m,marginTop:2}}>{ins.detail}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ── Sidebar helpers ────────────────────────────────────── */
 function SbLabel({ children }) {
   return <div style={{fontSize:14,fontWeight:600,color:P,marginBottom:6}}>{children}</div>;
@@ -942,6 +1038,7 @@ export default function App() {
         </div>
 
         {/* ── Main content ── */}
+        <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0}}>
         <div style={{flex:1,padding:24,overflowY:"auto",minWidth:0}}>
           {!file&&(
             <div style={{display:"flex",alignItems:"center",justifyContent:"center",
@@ -973,6 +1070,8 @@ export default function App() {
               {tab==="graphs"&&<OverviewGraphs graphs={options.overview_graphs} />}
             </>
           )}
+        </div>
+        {options && <AIInsightsFooter graphs={options.overview_graphs} />}
         </div>
       </div>
     </>
