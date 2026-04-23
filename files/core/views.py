@@ -96,6 +96,7 @@ class ExportView(APIView):
         file = request.FILES.get("lateral_loads_file")
         fmt = request.POST.get("format", "csv")
         story = request.POST.get("story")
+        shape = request.POST.get("shape", "")
         piers_selected_raw = request.POST.get("piers")
         piers_selected = json.loads(piers_selected_raw) if piers_selected_raw else []
 
@@ -104,7 +105,11 @@ class ExportView(APIView):
 
         file_path, storage_name = save_upload(file)
         try:
-            _, _, df = build_table(file_path, story, piers_selected)
+            df_full = read_pier_forces(file_path)
+            if shape == "I" and len(piers_selected) == 1:
+                _, _, df = build_table_I_from_df(df_full, story, piers_selected[0])
+            else:
+                _, _, df = build_table_from_df(df_full, story, piers_selected)
             if df is None:
                 return Response({"detail": "No data found."}, status=status.HTTP_400_BAD_REQUEST)
 

@@ -925,6 +925,7 @@ export default function App() {
     form.append("lateral_loads_file",file);
     form.append("story",story);
     form.append("piers",JSON.stringify(selectedPiers));
+    form.append("shape",shape);
     form.append("format",fmt);
     try {
       const res = await fetch(`${BASE}/api/export/`,{method:"POST",body:form});
