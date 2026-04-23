@@ -18,7 +18,7 @@ function ct(cell) {
 }
 
 /* ── Table ─────────────────────────────────────────────── */
-function Table({ data, onDownloadCSV, onDownloadXLSX }) {
+function Table({ data, panelLabels=[], onDownloadCSV, onDownloadXLSX }) {
   const [search, setSearch]       = useState("");
   const [sortCol, setSortCol]     = useState(null);
   const [sortDir, setSortDir]     = useState("asc");
@@ -48,7 +48,7 @@ function Table({ data, onDownloadCSV, onDownloadXLSX }) {
       </div>
     );
 
-  const { piers, data:rows, units={} } = data;
+  const { piers, columns, data:rows, units={} } = data;
   const allCases = [...new Set(rows.map(r => String(r[0])))];
 
   const toggleCase = c => setHiddenCases(prev => ({...prev, [c]: !prev[c]}));
@@ -83,7 +83,7 @@ function Table({ data, onDownloadCSV, onDownloadXLSX }) {
   const hiddenCount = Object.values(hiddenCases).filter(Boolean).length;
 
   const copyTable = () => {
-    const text = displayRows.map(row => row.map(ct).join("\t")).join("\n");
+    const text = displayRows.map(row => row.slice(1).map(ct).join("\t")).join("\n");
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -213,8 +213,49 @@ function Table({ data, onDownloadCSV, onDownloadXLSX }) {
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:14,
           fontFamily:"'Century Gothic',CenturyGothic,AppleGothic,sans-serif"}}>
           <thead style={{position:"sticky",top:0,zIndex:10}}>
+          {columns ? (
+            /* I-shape flat header */
+            <tr style={{background:"#f1f3f5"}}>
+              <th style={{padding:"10px 8px",textAlign:"center",fontWeight:700,fontSize:12,
+                whiteSpace:"nowrap",borderRight:"1px solid #dee2e6",borderBottom:"2px solid #ced4da",
+                background:P,color:"#fff",position:"sticky",top:0,zIndex:11,minWidth:40,width:40}}>
+                No.
+              </th>
+              <th onClick={()=>handleSort(0)}
+                style={{padding:"10px 16px",textAlign:"center",fontWeight:700,fontSize:13,
+                  whiteSpace:"nowrap",borderRight:"2px solid #dee2e6",borderBottom:"2px solid #ced4da",
+                  cursor:"pointer",userSelect:"none",minWidth:170,background:P,color:"#fff",
+                  position:"sticky",top:0,zIndex:11}}>
+                Output Case <SortIco i={0}/>
+              </th>
+              {columns.map((col,i)=>{
+                const ci = i+1;
+                const isConst = col==="Cmy"||col==="Cmz";
+                return (
+                  <th key={col} onClick={()=>!isConst&&handleSort(ci)}
+                    style={{padding:"10px 0",textAlign:"center",fontWeight:700,fontSize:13,
+                      whiteSpace:"nowrap",background:isConst?"#f0f4f8":"#f1f3f5",
+                      borderLeft:"1px solid #dee2e6",borderBottom:"2px solid #ced4da",
+                      cursor:isConst?"default":"pointer",userSelect:"none",
+                      width:"11%",minWidth:90,
+                      color:isConst?C.m:sortCol===ci?P:C.t}}>
+                    {colLabel(col)}{!isConst&&<SortIco i={ci}/>}
+                    {isConst&&<div style={{fontSize:10,fontWeight:400,color:C.m}}>= 1</div>}
+                  </th>
+                );
+              })}
+            </tr>
+          ) : (
+            <>
             {/* Row 1 — pier group names */}
             <tr style={{background:"#f1f3f5"}}>
+              <th rowSpan={2}
+                style={{padding:"10px 8px",textAlign:"center",fontWeight:700,fontSize:12,
+                  whiteSpace:"nowrap",verticalAlign:"middle",
+                  borderRight:"1px solid #dee2e6",borderBottom:"1px solid #dee2e6",
+                  minWidth:40,width:40,background:P,color:"#fff",position:"sticky",top:0,zIndex:11}}>
+                No.
+              </th>
               <th rowSpan={2} onClick={()=>handleSort(0)}
                 style={{padding:"10px 16px",textAlign:"center",fontWeight:700,fontSize:13,
                   whiteSpace:"nowrap",verticalAlign:"middle",
@@ -225,10 +266,16 @@ function Table({ data, onDownloadCSV, onDownloadXLSX }) {
               </th>
               {piers.map((p,i)=>(
                 <th key={i} colSpan={3}
-                  style={{padding:"10px 16px",textAlign:"center",fontWeight:700,fontSize:14,
+                  style={{padding:"8px 16px",textAlign:"center",fontWeight:700,fontSize:14,
                     color:P,whiteSpace:"nowrap",background:"#f1f3f5",
                     borderLeft:"2px solid #dee2e6",borderBottom:"1px solid #ced4da",
                     letterSpacing:"0.01em"}}>
+                  {panelLabels[i]&&(
+                    <div style={{fontSize:11,fontWeight:600,color:C.m,textTransform:"uppercase",
+                      letterSpacing:"0.06em",marginBottom:2}}>
+                      {panelLabels[i]}
+                    </div>
+                  )}
                   {p}
                 </th>
               ))}
@@ -252,6 +299,8 @@ function Table({ data, onDownloadCSV, onDownloadXLSX }) {
                 })
               )}
             </tr>
+            </>
+          )}
           </thead>
           <tbody>
             {pageRows.map((row,ri)=>(
@@ -259,13 +308,18 @@ function Table({ data, onDownloadCSV, onDownloadXLSX }) {
                 style={{background:ri%2===0?"#fff":"#f8f9fa"}}
                 onMouseEnter={e=>e.currentTarget.style.background="#e8f0fe"}
                 onMouseLeave={e=>e.currentTarget.style.background=ri%2===0?"#fff":"#f8f9fa"}>
+                <td style={{padding:"10px 8px",borderBottom:"1px solid #e9ecef",
+                  borderRight:"1px solid #dee2e6",textAlign:"center",fontSize:12,
+                  color:C.m,fontWeight:500,whiteSpace:"nowrap"}}>
+                  {start+ri+1}
+                </td>
                 {row.map((cell,j)=>(
                   <td key={j} style={{
-                    padding:"10px 16px",
+                    padding:"10px 8px",
                     borderBottom:"1px solid #e9ecef",
-                    borderLeft:j>0&&(j-1)%3===0?"2px solid #dee2e6":"none",
+                    borderLeft:columns?j>0?"1px solid #dee2e6":"none":j>0&&(j-1)%3===0?"2px solid #dee2e6":"none",
                     color:j===0?"#343a40":numColor(cell),
-                    whiteSpace:"nowrap",textAlign:j===0?"center":"right",
+                    whiteSpace:"nowrap",textAlign:j===0?"center":"center",
                     fontWeight:j===0?600:400,fontSize:14,
                   }}>
                     {ct(cell)}
@@ -795,7 +849,7 @@ export default function App() {
 
   const [shape, setShape]               = useState("");
   const [story, setStory]               = useState("");
-  const [selectedPiers, setSelectedPiers] = useState([]);
+  const [pierSlots, setPierSlots]       = useState([]);
   const [tab, setTab]                   = useState("table");
   const [helpOpen, setHelpOpen]         = useState(false);
   const helpRef = useRef(null);
@@ -809,7 +863,8 @@ export default function App() {
 
   const requiredPiers = SHAPES.find(s=>s.key===shape)?.piers||0;
   const pierOpts = story ? (options?.story_piers?.[story]||[]) : (options?.pier_options||[]);
-  const canApply = story && requiredPiers>0 && selectedPiers.length===requiredPiers;
+  const selectedPiers = pierSlots.filter(Boolean);
+  const canApply = story && requiredPiers>0 && selectedPiers.length===requiredPiers && new Set(selectedPiers).size===requiredPiers;
 
   useEffect(()=>{
     if(window.Plotly) return;
@@ -839,6 +894,7 @@ export default function App() {
     form.append("lateral_loads_file",file);
     form.append("story",story);
     form.append("piers",JSON.stringify(selectedPiers));
+    form.append("shape",shape);
     try {
       const res = await fetch(API_URL,{method:"POST",body:form});
       const json = await res.json();
@@ -851,15 +907,16 @@ export default function App() {
 
   const handleFile = useCallback(f=>{
     setFile(f); setOptions(null); setResult(null);
-    setShape(""); setStory(""); setSelectedPiers([]);
+    setShape(""); setStory(""); setPierSlots([]);
     uploadFile(f);
   },[uploadFile]);
 
   const handleShapeChange = s=>{
-    setShape(s); setSelectedPiers([]); setResult(null);
+    const n = SHAPES.find(x=>x.key===s)?.piers||0;
+    setShape(s); setPierSlots(Array(n).fill("")); setResult(null);
   };
   const handleStoryChange = s=>{
-    setStory(s); setSelectedPiers([]); setResult(null);
+    setStory(s); setPierSlots(prev=>prev.map(()=>"")); setResult(null);
   };
 
   const download = useCallback(async fmt=>{
@@ -1032,35 +1089,39 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Pier multi-select */}
+              {/* Pier slot dropdowns */}
               {shape&&requiredPiers>0&&(
                 <>
                   <Divider/>
                   <div style={{padding:"0 18px"}}>
-                    <SbLabel>Select Piers — {shape} shape</SbLabel>
-                    <div style={{height:200,overflowY:"auto",border:"1px solid "+
-                      (selectedPiers.length===requiredPiers?"#16a34a":C.b),
-                      borderRadius:4,background:C.card}}>
-                      {pierOpts.map(p=>{
-                        const checked = selectedPiers.includes(p);
-                        const atMax = selectedPiers.length===requiredPiers && !checked;
+                    <SbLabel>Select Panels — {shape} shape</SbLabel>
+                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      {pierSlots.map((val,i)=>{
+                        const label = requiredPiers===1?"Panel":`Panel ${i+1}`;
+                        const usedElsewhere = pierSlots.filter((_,j)=>j!==i);
+                        const opts = pierOpts.filter(p=>!usedElsewhere.includes(p));
+                        const ready = !!val;
                         return (
-                          <label key={p} style={{display:"flex",alignItems:"center",gap:8,
-                            padding:"4px 10px",cursor:atMax?"not-allowed":"pointer",fontSize:13,
-                            background:checked?"#27436514":"transparent",
-                            color:atMax?C.m:checked?P:C.t,opacity:atMax?0.5:1}}>
-                            <input type="checkbox" checked={checked} disabled={atMax}
-                              onChange={()=>{
-                                if(checked) setSelectedPiers(selectedPiers.filter(x=>x!==p));
-                                else if(!atMax) setSelectedPiers([...selectedPiers, p]);
+                          <div key={i}>
+                            <div style={{fontSize:12,fontWeight:600,color:C.m,marginBottom:3}}>{label}</div>
+                            <select value={val}
+                              onChange={e=>{
+                                const next=[...pierSlots];
+                                next[i]=e.target.value;
+                                setPierSlots(next);
                               }}
-                              style={{accentColor:P,cursor:atMax?"not-allowed":"pointer",margin:0}} />
-                            {p}
-                          </label>
+                              style={{width:"100%",padding:"7px 10px",borderRadius:6,
+                                border:"1px solid "+(ready?"#16a34a":C.b),
+                                background:C.card,color:val?C.t:C.m,
+                                fontSize:13,outline:"none",cursor:"pointer"}}>
+                              <option value="">— Select pier —</option>
+                              {opts.map(p=><option key={p} value={p}>{p}</option>)}
+                            </select>
+                          </div>
                         );
                       })}
                     </div>
-                    <div style={{fontSize:11,marginTop:5,
+                    <div style={{fontSize:11,marginTop:8,
                       color:selectedPiers.length===requiredPiers?"#16a34a":C.m}}>
                       {selectedPiers.length}/{requiredPiers} selected
                       {selectedPiers.length<requiredPiers
@@ -1089,7 +1150,7 @@ export default function App() {
                     <button onClick={()=>{
                         setFile(null); setFileKey(k=>k+1);
                         setOptions(null); setResult(null);
-                        setShape(""); setStory(""); setSelectedPiers([]);
+                        setShape(""); setStory(""); setPierSlots([]);
                         setError(null);
                       }}
                       style={{width:"100%",padding:"7px 0",borderRadius:28,
@@ -1132,6 +1193,7 @@ export default function App() {
               </div>
 
               {tab==="table"&&<Table data={result.table}
+                panelLabels={selectedPiers.map((_,i)=>requiredPiers===1?"Panel":`Panel ${i+1}`)}
                 onDownloadCSV={()=>download("csv")}
                 onDownloadXLSX={()=>download("xlsx")} />}
               {tab==="graphs"&&(overviewLoading

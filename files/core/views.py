@@ -10,7 +10,9 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .scontable import read_pier_forces, get_stories_and_piers_from_df, build_table_from_df, build_overview_graphs_from_df, read_units_from_df, read_pier_forces_light
+from .scontable import (read_pier_forces, get_stories_and_piers_from_df,
+    build_table_from_df, build_table_I_from_df, I_COLS,
+    build_overview_graphs_from_df, read_units_from_df, read_pier_forces_light)
 
 ALLOWED_EXTENSIONS = {".xlsx"}
 
@@ -49,9 +51,18 @@ class UploadView(APIView):
             piers_selected = json.loads(piers_selected_raw) if piers_selected_raw else []
 
             if story and piers_selected:
+                shape = request.POST.get("shape", "")
                 df = read_pier_forces(file_path)
                 stories, all_piers, story_piers = get_stories_and_piers_from_df(df)
                 units = read_units_from_df(file_path, df)
+                if shape == "I" and len(piers_selected) == 1:
+                    pier, table_data, _ = build_table_I_from_df(df, story, piers_selected[0])
+                    return Response({
+                        "story_options": stories,
+                        "pier_options": all_piers,
+                        "story_piers": story_piers,
+                        "table": {"piers": [pier], "columns": I_COLS, "data": table_data, "units": units},
+                    }, status=status.HTTP_200_OK)
                 table_piers, table_data, _ = build_table_from_df(df, story, piers_selected)
                 return Response({
                     "story_options": stories,

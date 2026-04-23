@@ -28,13 +28,20 @@ def read_pier_forces(file_path):
         f"Sheets found: {xl.sheet_names}"
     )
 
+EXTRA_COLS = ["T", "V3", "M2"]
+
 def _clean_pier_df(df):
-    df = df[["Story", "Pier", "Output Case", "Location", "P", "V2", "M3"]]
+    base = ["Story", "Pier", "Output Case", "Location", "P", "V2", "M3"]
+    extra = [c for c in EXTRA_COLS if c in df.columns]
+    df = df[base + extra]
     df = df[df["Location"] == "Bottom"].copy()
     df["Story"] = df["Story"].astype(str)
     df["Pier"] = df["Pier"].astype(str)
-    for col in ["P", "V2", "M3"]:
+    for col in ["P", "V2", "M3"] + extra:
         df[col] = pd.to_numeric(df[col], errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0)
+    for col in EXTRA_COLS:
+        if col not in df.columns:
+            df[col] = 0.0
     return df
 
 
@@ -146,6 +153,34 @@ def build_table_from_df(df, story, piers):
     export_cols = ["Output Case"] + [f"{c} ({p})" for p in piers for c in ["P", "V2", "M3"]]
     df_export = pd.DataFrame(rows, columns=export_cols)
     return piers, rows, df_export
+
+
+I_COLS = ["P", "T", "V2", "M2", "Cmy", "V3", "M3", "Cmz"]
+
+def build_table_I_from_df(df, story, pier):
+    """8-column table for I-shape: P, T, V2, M2, Cmy=1, V3, M3, Cmz=1."""
+    df_sub = df[(df["Story"] == story) & (df["Pier"] == pier)]
+    cases = sorted(df_sub["Output Case"].dropna().unique().tolist())
+    rows = []
+    for case in cases:
+        sub = df_sub[df_sub["Output Case"] == case]
+        if sub.empty:
+            rows.append([case, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0])
+        else:
+            r = sub.iloc[0]
+            rows.append([case,
+                round(float(r["P"]),  3),
+                round(float(r["T"]),  3),
+                round(float(r["V2"]), 3),
+                round(float(r["M2"]), 3),
+                1.0,
+                round(float(r["V3"]), 3),
+                round(float(r["M3"]), 3),
+                1.0,
+            ])
+    export_cols = ["Output Case"] + I_COLS
+    df_export = pd.DataFrame(rows, columns=export_cols)
+    return pier, rows, df_export
 
 
 def _rnd(v):
