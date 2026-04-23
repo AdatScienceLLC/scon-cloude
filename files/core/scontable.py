@@ -155,7 +155,7 @@ def build_table_from_df(df, story, piers):
     return piers, rows, df_export
 
 
-I_COLS = ["P", "T", "V2", "M2", "Cmy", "V3", "M3", "Cmz"]
+I_COLS = ["P", "T", "V3", "M2", "Cmy", "V2", "M3", "Cmz"]
 
 def build_table_I_from_df(df, story, pier):
     """8-column table for I-shape: P, T, V2, M2, Cmy=1, V3, M3, Cmz=1."""
@@ -171,10 +171,10 @@ def build_table_I_from_df(df, story, pier):
             rows.append([case,
                 round(float(r["P"]),  3),
                 round(float(r["T"]),  3),
-                round(float(r["V2"]), 3),
+                round(float(r["V3"]), 3),
                 round(float(r["M2"]), 3),
                 1.0,
-                round(float(r["V3"]), 3),
+                round(float(r["V2"]), 3),
                 round(float(r["M3"]), 3),
                 1.0,
             ])
