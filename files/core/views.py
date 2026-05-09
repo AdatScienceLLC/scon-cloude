@@ -46,29 +46,34 @@ class UploadView(APIView):
 
         file_path, storage_name = save_upload(file)
         try:
-            story = request.POST.get("story")
+            stories_raw = request.POST.get("stories")
             piers_selected_raw = request.POST.get("piers")
             piers_selected = json.loads(piers_selected_raw) if piers_selected_raw else []
+            stories_list = json.loads(stories_raw) if stories_raw else []
 
-            if story and piers_selected:
-                shape = request.POST.get("shape", "")
+            if stories_list and piers_selected:
+                shape     = request.POST.get("shape", "")
+                load_type = request.POST.get("load_type", "panel")
                 df = read_pier_forces(file_path)
-                stories, all_piers, story_piers = get_stories_and_piers_from_df(df)
+                all_stories, all_piers, story_piers = get_stories_and_piers_from_df(df)
                 units = read_units_from_df(file_path, df)
-                if shape == "I" and len(piers_selected) == 1:
-                    pier, table_data, _ = build_table_I_from_df(df, story, piers_selected[0])
-                    return Response({
-                        "story_options": stories,
-                        "pier_options": all_piers,
-                        "story_piers": story_piers,
-                        "table": {"piers": [pier], "columns": I_COLS, "data": table_data, "units": units},
-                    }, status=status.HTTP_200_OK)
-                table_piers, table_data, _ = build_table_from_df(df, story, piers_selected)
+                use_sectional = (
+                    (shape == "I" and len(piers_selected) == 1) or
+                    (shape in ("C", "L") and load_type == "sectional" and len(piers_selected) == 1)
+                )
+                tables = {}
+                for s in stories_list:
+                    if use_sectional:
+                        pier, table_data, _ = build_table_I_from_df(df, s, piers_selected[0])
+                        tables[s] = {"piers": [pier], "columns": I_COLS, "data": table_data, "units": units}
+                    else:
+                        table_piers, table_data, _ = build_table_from_df(df, s, piers_selected)
+                        tables[s] = {"piers": table_piers, "data": table_data, "units": units}
                 return Response({
-                    "story_options": stories,
+                    "story_options": all_stories,
                     "pier_options": all_piers,
                     "story_piers": story_piers,
-                    "table": {"piers": table_piers, "data": table_data, "units": units},
+                    "tables": tables,
                 }, status=status.HTTP_200_OK)
 
             # Initial upload: use light read (stories/piers only, no heavy graph computation)
@@ -78,7 +83,7 @@ class UploadView(APIView):
                 "pier_options": all_piers,
                 "story_piers": story_piers,
                 "overview_graphs": None,
-                "table": None,
+                "tables": None,
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -97,6 +102,7 @@ class ExportView(APIView):
         fmt = request.POST.get("format", "csv")
         story = request.POST.get("story")
         shape = request.POST.get("shape", "")
+        load_type = request.POST.get("load_type", "panel")
         piers_selected_raw = request.POST.get("piers")
         piers_selected = json.loads(piers_selected_raw) if piers_selected_raw else []
 
@@ -106,7 +112,11 @@ class ExportView(APIView):
         file_path, storage_name = save_upload(file)
         try:
             df_full = read_pier_forces(file_path)
-            if shape == "I" and len(piers_selected) == 1:
+            use_sectional = (
+                (shape == "I" and len(piers_selected) == 1) or
+                (shape in ("C", "L") and load_type == "sectional" and len(piers_selected) == 1)
+            )
+            if use_sectional:
                 _, _, df = build_table_I_from_df(df_full, story, piers_selected[0])
             else:
                 _, _, df = build_table_from_df(df_full, story, piers_selected)
