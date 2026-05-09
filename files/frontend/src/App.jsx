@@ -483,9 +483,61 @@ function ProfileCard({title,traces,xTitle}){
   </ChartCard>);
 }
 
+function PierElevationCard({graphs}){
+  const piers=(graphs.v2_profile||[]).map(t=>t.name);
+  const [pier,setPier]=useState(piers[0]||"");
+  const activePier=pier||piers[0]||"";
+
+  const getTrace=(profileTraces,color,label)=>{
+    const t=(profileTraces||[]).find(tr=>tr.name===activePier);
+    if(!t||!t.x?.length) return [];
+    return [{type:"bar",orientation:"h",x:t.x,y:t.y,
+      marker:{color,opacity:0.82},
+      hovertemplate:`<b>%{y}</b><br>${label}: %{x}<extra></extra>`}];
+  };
+
+  const storyCount=(graphs.v2_profile?.[0]?.y||[]).length;
+  const h=Math.max(300,storyCount*22+80);
+  const mkLayout=xTitle=>({height:h,margin:{t:16,r:16,b:50,l:90},
+    xaxis:{title:xTitle,automargin:true,zeroline:true,zerolinecolor:"#e3e6eb",zerolinewidth:1.5},
+    yaxis:{automargin:true,tickfont:{size:10},type:"category"},showlegend:false});
+
+  if(!piers.length) return null;
+  return(
+    <div style={CARD}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,paddingBottom:8,borderBottom:"1px solid "+C.b}}>
+        <div style={{fontWeight:700,fontSize:14,color:C.t}}>Load Distribution by Floor — Selected Pier</div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <label style={{fontSize:11,fontWeight:600,color:C.m,textTransform:"uppercase",letterSpacing:"0.05em",whiteSpace:"nowrap"}}>Pier</label>
+          <select value={activePier} onChange={e=>setPier(e.target.value)}
+            style={{padding:"5px 10px",borderRadius:6,border:"1px solid "+C.b,background:"#fff",fontSize:13,color:C.t,outline:"none",minWidth:110,cursor:"pointer"}}>
+            {piers.map(p=><option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
+        <div>
+          <div style={{fontSize:11,fontWeight:600,color:C.m,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6}}>Axial P — Max |P| (kip)</div>
+          <PlotlyChart traces={getTrace(graphs.p_profile,"#10b981","Max |P|")} layout={mkLayout("Max |P| (kip)")}/>
+        </div>
+        <div>
+          <div style={{fontSize:11,fontWeight:600,color:C.m,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6}}>Shear V2 — Max |V2| (kip)</div>
+          <PlotlyChart traces={getTrace(graphs.v2_profile,"#274365","Max |V2|")} layout={mkLayout("Max |V2| (kip)")}/>
+        </div>
+        <div>
+          <div style={{fontSize:11,fontWeight:600,color:C.m,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6}}>Moment M3 — Max |M3| (kip-ft)</div>
+          <PlotlyChart traces={getTrace(graphs.m3_profile,"#ef4444","Max |M3|")} layout={mkLayout("Max |M3| (kip-ft)")}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OverviewGraphs({graphs}){
   if(!graphs) return null;
   return(<div style={{display:"flex",flexDirection:"column",gap:20}}>
+    <SectionTitle>Single Pier Load Distribution by Floor</SectionTitle>
+    <PierElevationCard graphs={graphs}/>
     <SectionTitle>Pier Demand — Distribution &amp; Governing Load Case</SectionTitle>
     <ForcePieBarCard title="Shear Force V2"       forceKey="v2" forceDist={graphs.force_dist} yLabel="Max |V2| (kip)"/>
     <ForcePieBarCard title="Overturning Moment M3" forceKey="m3" forceDist={graphs.force_dist} yLabel="Max |M3| (kip-ft)"/>
