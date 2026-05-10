@@ -13,7 +13,7 @@ def _nsort(s):
 REQUIRED_COLS = {"Story", "Pier", "Output Case", "Location", "P", "V2", "M3"}
 
 def read_pier_forces(file_path):
-    xl = pd.ExcelFile(file_path)
+    xl = pd.ExcelFile(file_path, engine="calamine")
     # Try every sheet and every likely header row
     for sheet in xl.sheet_names:
         for hdr in range(5):
@@ -47,7 +47,7 @@ def _clean_pier_df(df):
 
 def read_pier_forces_light(file_path):
     """Fast metadata-only read: returns (stories, piers, story_piers) without loading P/V2/M3."""
-    xl = pd.ExcelFile(file_path)
+    xl = pd.ExcelFile(file_path, engine="calamine")
     for sheet in xl.sheet_names:
         for hdr in range(5):
             try:
@@ -76,12 +76,12 @@ def get_stories_and_piers(file_path):
 
 def read_units(file_path):
     try:
-        xl = pd.ExcelFile(file_path)
+        xl = pd.ExcelFile(file_path, engine="calamine")
         df_raw = None
         for sheet in xl.sheet_names:
             for hdr in range(5):
                 try:
-                    tmp = pd.read_excel(file_path, sheet_name=sheet, header=hdr, nrows=1)
+                    tmp = pd.read_excel(file_path, sheet_name=sheet, header=hdr, nrows=1, engine="calamine")
                     if REQUIRED_COLS.issubset(set(tmp.columns)):
                         df_raw = tmp
                         break
@@ -109,11 +109,11 @@ def read_units(file_path):
 
 def read_units_from_df(file_path, df):
     try:
-        xl = pd.ExcelFile(file_path)
+        xl = pd.ExcelFile(file_path, engine="calamine")
         for sheet in xl.sheet_names:
             for hdr in range(5):
                 try:
-                    tmp = pd.read_excel(file_path, sheet_name=sheet, header=hdr, nrows=1)
+                    tmp = pd.read_excel(file_path, sheet_name=sheet, header=hdr, nrows=1, engine="calamine")
                     if REQUIRED_COLS.issubset(set(tmp.columns)):
                         units = {}
                         for col in ["P", "V2", "M3"]:

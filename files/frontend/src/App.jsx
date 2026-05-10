@@ -32,7 +32,7 @@ function getOrientedTableData(data, isFlipped) {
 }
 
 /* ── Table ─────────────────────────────────────────────── */
-function Table({ data, panelLabels=[], orientation=0, onOrientationChange, onCopyAll }) {
+function Table({ data, panelLabels=[], orientation=0, onOrientationChange, onCopyAll, onDownload }) {
   const [search, setSearch]         = useState("");
   const [sortCol, setSortCol]       = useState(null);
   const [sortDir, setSortDir]       = useState("asc");
@@ -195,6 +195,18 @@ function Table({ data, panelLabels=[], orientation=0, onOrientationChange, onCop
             </svg>{onCopyAll ? "Copy All Floors" : "Copy"}</>
           )}
         </button>
+
+        {onDownload&&(
+          <button onClick={onDownload} title="Download all floors as CSV (Excel)"
+            style={{display:"flex",alignItems:"center",gap:5,padding:"0 12px",height:32,
+              border:"1px solid #dee2e6",borderRadius:5,background:"#fff",
+              cursor:"pointer",color:"#495057",fontSize:13,fontWeight:500,flexShrink:0}}>
+            <svg width="13" height="13" viewBox="0 0 20 20" fill="none">
+              <path d="M10 3v10M6 9l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M3 17h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>Download
+          </button>
+        )}
 
         {columns && onOrientationChange && (
           <>
@@ -742,9 +754,30 @@ export default function App(){
     const order=(options?.story_options||[]).filter(s=>s in result.tables);
     const lines=order.flatMap(s=>{
       const tData=result.tables[s]; if(!tData?.data?.length) return [];
-      return[`[${s}]`,...tData.data.map(row=>row.slice(1).map(ct).join("\t")),""];
+      return tData.data.map(row=>row.slice(1).map(ct).join("\t"));
     });
-    navigator.clipboard.writeText(lines.join("\n").trimEnd()).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); });
+    navigator.clipboard.writeText(lines.join("\n")).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); });
+  },[result,options]);
+
+  const downloadAllFloors=useCallback(()=>{
+    if(!result?.tables) return;
+    const order=(options?.story_options||[]).filter(s=>s in result.tables);
+    const csvRows=[];
+    order.forEach(s=>{
+      const tData=result.tables[s]; if(!tData?.data?.length) return;
+      csvRows.push([`[${s}]`]);
+      const headers=tData.columns
+        ?["Output Case",...tData.columns]
+        :["Output Case",...(tData.piers||[]).flatMap(p=>[`P (${p})`,`V2 (${p})`,`M3 (${p})`])];
+      csvRows.push(headers);
+      tData.data.forEach(row=>csvRows.push(row.map(ct)));
+      csvRows.push([]);
+    });
+    const csv=csvRows.map(row=>row.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download="pier_forces_all_floors.csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   },[result,options]);
 
   const infoInput={border:"none",borderBottom:"1px solid #ccc",padding:"3px 4px",fontSize:13,color:C.t,background:"transparent",outline:"none",width:"100%"};
@@ -952,7 +985,8 @@ export default function App(){
                 panelLabels={selectedPiers.map((_,i)=>effectivePierCount===1?"Panel":`Panel ${i+1}`)}
                 orientation={orientation}
                 onOrientationChange={isSectional?setOrientation:undefined}
-                onCopyAll={storyOrder.length>1?copyAllStories:undefined}/>
+                onCopyAll={storyOrder.length>1?copyAllStories:undefined}
+                onDownload={storyOrder.length>0?downloadAllFloors:undefined}/>
             </>)}
             {tab==="graphs"&&(overviewLoading
               ?<div style={{display:"flex",alignItems:"center",gap:10,padding:40,color:C.m}}><div style={{width:16,height:16,border:"2px solid "+C.b,borderTop:"2px solid "+P,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>Analysing full dataset for graphs…</div>
